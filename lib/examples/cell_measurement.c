@@ -49,6 +49,8 @@ cell_search_cfg_t cell_detect_config = {
   0
 };
 
+
+
 /**********************************************************************
  *  Program arguments processing
  ***********************************************************************/
@@ -300,6 +302,24 @@ int main(int argc, char **argv) {
   
   float rx_gain_offset = 0;
 
+  // obtain a string of current_month_day_hour_minute_second
+  time_t rawtime;
+  struct tm * timeinfo;
+  char buffer[80];
+  time (&rawtime);
+  timeinfo = localtime(&rawtime);
+  strftime(buffer,80,"%m_%d_%H_%M_%S",timeinfo);
+  //open file in the current folder then data/ with name "RSSI_freq_%d_current_month_day_hour_minute_second", if not exist, create one
+  char filename[100];
+  double freq_in_MHz = prog_args.rf_freq / 1e6;
+  sprintf(filename, "./data/RSSI_freq_%4.0f_%s", freq_in_MHz, buffer);
+  FILE *RSSI_fp;
+  RSSI_fp = fopen(filename, "w");  
+  if (RSSI_fp == NULL) {
+    printf("Error opening file!\n");
+    exit(1);
+  }  
+
   /* Main loop */
   while ((sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1) && !go_exit) {
     
@@ -376,8 +396,7 @@ int main(int argc, char **argv) {
         // Plot and Printf
         if ((nframes%10) == 0) {
 
-          printf("CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, "
-                 "RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r",
+          printf("CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
                 srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
                 10*log10(rssi*1000) - rx_gain_offset,                        
                 10*log10(rssi_utra*1000)- rx_gain_offset, 
@@ -386,6 +405,14 @@ int main(int argc, char **argv) {
           if (srslte_verbose != SRSLTE_VERBOSE_NONE) {
             printf("\n");
           }
+
+          // write "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n" into the file
+          fprintf(RSSI_fp, "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
+                        srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
+                        10*log10(rssi*1000) - rx_gain_offset,                        
+                        10*log10(rssi_utra*1000)- rx_gain_offset, 
+                        10*log10(rsrp*1000) - rx_gain_offset, 
+                        10*log10(rsrq), 10*log10(snr));
         }
         break;
       }
@@ -404,6 +431,10 @@ int main(int argc, char **argv) {
         
     sf_cnt++;                  
   } // Main loop
+  
+  extern double *power_peak;
+  fprintf(RSSI_fp, "power_peak: %f\r\n", *power_peak);
+  fclose(RSSI_fp);
 
   for (int i = 0; i < SRSLTE_MAX_CODEWORDS; i++) {
     if (data[i]) {

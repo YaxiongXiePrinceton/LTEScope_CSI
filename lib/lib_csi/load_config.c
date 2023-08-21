@@ -145,7 +145,7 @@ int read_config_master(srslte_config_t* config){
 	printf("down_sample_subframe:%d\n", config->csiLog_config.down_sample_subframe);
     }
 
-    if(! config_lookup_bool(cfg, "csiLog_config.repeat_flag", &config->csiLog_config.repeat_flag)){
+    if(! config_lookup_int(cfg, "csiLog_config.repeat_flag", &config->csiLog_config.repeat_flag)){
 	printf("ERROR: reading repeat_flag\n");
     }else{
 	printf("repeat_flag:%d\n", config->csiLog_config.repeat_flag);

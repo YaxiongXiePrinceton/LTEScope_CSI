@@ -39,6 +39,10 @@
 #include "srslte/phy/rf/rf.h"
 #include "srslte/phy/rf/rf_utils.h"
 
+// global variable
+double *power_peak;
+double power;
+
 int rf_rssi_scan(srslte_rf_t *rf, float *freqs, float *rssi, int nof_bands, double fs, int nsamp) {
   int i, j;
   int ret = -1;
@@ -206,7 +210,9 @@ int rf_cell_search(srslte_rf_t *rf, uint32_t nof_rx_antennas,
            found_cells[i].mode*100,
            found_cells[i].psr, 20*log10(found_cells[i].peak*1000));
   }
-  
+  power = 20*log10(found_cells[max_peak_cell].peak*1000);
+  power_peak = &power;
+
   // Save result 
   if (cell) {
     cell->id = found_cells[max_peak_cell].cell_id;

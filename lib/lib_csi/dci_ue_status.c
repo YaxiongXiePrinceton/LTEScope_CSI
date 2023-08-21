@@ -1,5 +1,7 @@
 #include <string.h>
 #include <strings.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include <math.h>
 #include <sys/time.h>
@@ -16,6 +18,17 @@
 
 #include "srsgui/srsgui.h"
 
+#define SERVER_PORT 12345
+#define PC2_IP_ADDRESS "192.168.0.2"
+#define PREAMBLE 0xAAAA
+#define ACK 0xBBBB
+#define END 0xCCCC
+#define BUFFER_SIZE 1024
+
+int sockfd; 
+struct sockaddr_in servaddr, cliaddr;
+
+
 extern bool go_exit;
 srslte_config_t main_config;            // configuration (which is stored inside the configuration file .cfg)
 
@@ -25,6 +38,25 @@ extern lteCCA_status_t	    ue_status_t;    // ue status
 extern pthread_mutex_t mutex_csi;
 extern pthread_mutex_t mutex_exit;
 extern pthread_mutex_t mutex_usage;
+
+void socket_init() {
+    // Creating socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&servaddr, 0, sizeof(servaddr));
+
+    // Assign IP and PORT
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(PC2_IP_ADDRESS);
+    servaddr.sin_port = htons(SERVER_PORT);
+
+    // Bind socket to IP
+    bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
+    listen(sockfd, 10);
+}
+
+void socket_exit() {
+    close(sockfd);
+}
 
 void* dci_ue_status_update(void* p){
     int thd_idx	    = *(int *)p;
@@ -49,64 +81,195 @@ void* dci_ue_status_update(void* p){
     int repeat_log_intval_s	= main_config.csiLog_config.repeat_log_intval_s;
     int repeat_pause_intval_s	= main_config.csiLog_config.repeat_pause_intval_s;
 
+	socket_init();
+
     int trace_count = 0;
 
-    while(true){
-		pthread_mutex_lock( &mutex_exit);
-		if(go_exit){
-			pthread_mutex_unlock( &mutex_exit);
-			break;
-		}
-		pthread_mutex_unlock( &mutex_exit);
-		start_time_ms	= timestamp_ms();
-		trace_count++;
-
-		printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
+	if(repeat_flag == 1 || repeat_flag == 0){
 		while(true){
 			pthread_mutex_lock( &mutex_exit);
 			if(go_exit){
 				pthread_mutex_unlock( &mutex_exit);
+				socket_exit();
 				break;
 			}
 			pthread_mutex_unlock( &mutex_exit);
-		
-			pthread_mutex_lock( &mutex_usage);
-			lteCCA_status_update(&ue_status_t, &ue_cell_usage);
-			pthread_mutex_unlock( &mutex_usage);
+			start_time_ms	= timestamp_ms();
+			trace_count++;
 
-			/*Check the status every 0.5s*/
-			if(repeat_flag == 1){	    
-				uint32_t curr_time_ms	= timestamp_ms();
-				uint32_t time_elapse_ms	= curr_time_ms - start_time_ms;
-				if(time_elapse_ms >= repeat_log_intval_s * 1000){
-					lteCCA_update_fileDescriptor_folder(&ue_status_t, main_config.usrp_config);
-					//lteCCA_update_fileDescriptor(&ue_status_t, main_config.usrp_config);
+			printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
+			while(true){
+				pthread_mutex_lock( &mutex_exit);
+				if(go_exit){
+					pthread_mutex_unlock( &mutex_exit);
 					break;
 				}
-			}
-			usleep(5e2);
-		}
-		if(repeat_flag == 1){
-			printf("\n\nWe finish logging and are going to pause for %d seconds! \n", repeat_pause_intval_s);
-			for(int i=0;i<repeat_pause_intval_s;i++){
+				pthread_mutex_unlock( &mutex_exit);
+			
+				pthread_mutex_lock( &mutex_usage);
+				// log CSI
+				lteCCA_status_update(&ue_status_t, &ue_cell_usage);
+				pthread_mutex_unlock( &mutex_usage);
 
+				/*Check the status every 0.5s*/
+				if(repeat_flag == 1){	    
+					uint32_t curr_time_ms	= timestamp_ms();
+					uint32_t time_elapse_ms	= curr_time_ms - start_time_ms;
+					if(time_elapse_ms >= repeat_log_intval_s * 1000){
+						lteCCA_update_fileDescriptor_folder(&ue_status_t, main_config.usrp_config);
+						//lteCCA_update_fileDescriptor(&ue_status_t, main_config.usrp_config);
+						break;
+					}
+				}
+				usleep(5e2);
+			}
+			if(repeat_flag == 1){
+				printf("\n\nWe finish logging and are going to pause for %d seconds! \n", repeat_pause_intval_s);
+				for(int i=0;i<repeat_pause_intval_s;i++){
+					pthread_mutex_lock( &mutex_exit);
+					if(go_exit){
+						pthread_mutex_unlock( &mutex_exit);
+						break;
+					}
+					pthread_mutex_unlock( &mutex_exit);
+
+					if(i%5 == 0){
+						printf("We have slep for %d seconds!\n", i);
+					}
+					sleep(1);
+				}
+			}
+		}
+	}
+	else if(repeat_flag == 2){
+		socklen_t len = sizeof(cliaddr);
+		printf("\n\nSocket: Waiting for client to connect! \n");
+		int connfd = accept(sockfd, (struct sockaddr*)&cliaddr, &len);
+		if (connfd < 0) {
+			perror("Accept error");
+		}		
+
+		// Set the timeout for the socket after successful connection
+		struct timeval timeout;
+		timeout.tv_sec = 20;  // 20 seconds
+		timeout.tv_usec = 0;  // 0 microseconds
+		if (setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+			perror("setsockopt failed");
+		}
+
+		printf("\n\nSocket: Connection Success! \n");
+		while(true){
 			pthread_mutex_lock( &mutex_exit);
 			if(go_exit){
 				pthread_mutex_unlock( &mutex_exit);
+				close(connfd);
+				socket_exit();
 				break;
 			}
 			pthread_mutex_unlock( &mutex_exit);
 
-			if(i%5 == 0){
-				printf("We have slep for %d seconds!\n", i);
+			char buffer[BUFFER_SIZE] = {0};
+			ssize_t bytesRead = recv(connfd, buffer, BUFFER_SIZE, 0);
+
+			if (bytesRead <= 0) {
+				perror("Recv error or connection closed by client");
+				continue;  // Exit to outer loop and wait for a new connection
+			}		
+
+			printf("\n\nSocket: Reception Success! \n");
+
+			if (*(uint16_t*)buffer == PREAMBLE) {
+				start_time_ms	= timestamp_ms();
+				trace_count++;
+				printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
+				while(true){
+					pthread_mutex_lock( &mutex_exit);
+					if(go_exit){
+						pthread_mutex_unlock( &mutex_exit);
+						break;
+					}
+					pthread_mutex_unlock( &mutex_exit);
+				
+					pthread_mutex_lock( &mutex_usage);
+					// log CSI
+					lteCCA_status_update(&ue_status_t, &ue_cell_usage);
+					pthread_mutex_unlock( &mutex_usage);
+
+					/*Check the status every 0.5s*/	    
+					uint32_t curr_time_ms	= timestamp_ms();
+					uint32_t time_elapse_ms	= curr_time_ms - start_time_ms;
+					if(time_elapse_ms >= repeat_log_intval_s * 1000){
+						lteCCA_update_fileDescriptor_folder(&ue_status_t, main_config.usrp_config);
+
+						uint16_t ack_buffer = ACK;
+						send(connfd, &ack_buffer, sizeof(ack_buffer), 0);
+						printf("\n\nSocket: We finish logging and are going to wait for next signal! \n");
+						break;
+					}
+					usleep(5e2);
+				}
 			}
-			sleep(1);
+			else if (*(uint16_t*)buffer == END){
+				printf("\n\nSocket: Client sent an endding signal! \n");
+				close(connfd);
+				break;
 			}
 		}
-    }
+	}
+	//close(connfd);
     lteCCA_status_exit(&ue_status_t);
 
     pthread_exit(NULL);
+}
+
+// Function to obtain RSSI, RSRP, RSRQ, SNR
+void* measure_cell() {
+	if (srslte_ue_sync_get_sfidx(&ue_sync) == 5) {
+		/* Run FFT for all subframe data */
+		srslte_ofdm_rx_sf(&fft);
+		
+		srslte_chest_dl_estimate(&chest, sf_symbols, ce, srslte_ue_sync_get_sfidx(&ue_sync));
+				
+		rssi = SRSLTE_VEC_EMA(srslte_vec_avg_power_cf(sf_buffer[0],SRSLTE_SF_LEN(srslte_symbol_sz(cell.nof_prb))),rssi,0.05);
+		rssi_utra = SRSLTE_VEC_EMA(srslte_chest_dl_get_rssi(&chest),rssi_utra,0.05);
+		rsrq = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrq(&chest),rsrq,0.05);
+		rsrp = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrp(&chest),rsrp,0.05);      
+		snr = SRSLTE_VEC_EMA(srslte_chest_dl_get_snr(&chest),snr,0.05);      
+		
+		nframes++;          
+	} 
+	
+	
+	if ((nframes%100) == 0 || rx_gain_offset == 0) {
+		if (srslte_rf_has_rssi(&rf)) {
+		rx_gain_offset = 30+10*log10(rssi*1000)-srslte_rf_get_rssi(&rf);
+		} else {
+		rx_gain_offset = srslte_rf_get_rx_gain(&rf);            
+		}
+	}
+	
+	// Plot and Printf
+	if ((nframes%10) == 0) {
+
+		printf("CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
+			srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
+			10*log10(rssi*1000) - rx_gain_offset,                        
+			10*log10(rssi_utra*1000)- rx_gain_offset, 
+			10*log10(rsrp*1000) - rx_gain_offset, 
+			10*log10(rsrq), 10*log10(snr));                
+		if (srslte_verbose != SRSLTE_VERBOSE_NONE) {
+			printf("\n");
+		}
+
+		// write "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n" into the file
+		fprintf(RSSI_fp, "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
+					srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
+					10*log10(rssi*1000) - rx_gain_offset,                        
+					10*log10(rssi_utra*1000)- rx_gain_offset, 
+					10*log10(rsrp*1000) - rx_gain_offset, 
+					10*log10(rsrq), 10*log10(snr));
+	}
+
 }
 
 
