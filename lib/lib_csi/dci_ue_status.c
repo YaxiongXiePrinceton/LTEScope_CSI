@@ -222,55 +222,7 @@ void* dci_ue_status_update(void* p){
     pthread_exit(NULL);
 }
 
-// Function to obtain RSSI, RSRP, RSRQ, SNR
-void* measure_cell() {
-	if (srslte_ue_sync_get_sfidx(&ue_sync) == 5) {
-		/* Run FFT for all subframe data */
-		srslte_ofdm_rx_sf(&fft);
-		
-		srslte_chest_dl_estimate(&chest, sf_symbols, ce, srslte_ue_sync_get_sfidx(&ue_sync));
-				
-		rssi = SRSLTE_VEC_EMA(srslte_vec_avg_power_cf(sf_buffer[0],SRSLTE_SF_LEN(srslte_symbol_sz(cell.nof_prb))),rssi,0.05);
-		rssi_utra = SRSLTE_VEC_EMA(srslte_chest_dl_get_rssi(&chest),rssi_utra,0.05);
-		rsrq = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrq(&chest),rsrq,0.05);
-		rsrp = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrp(&chest),rsrp,0.05);      
-		snr = SRSLTE_VEC_EMA(srslte_chest_dl_get_snr(&chest),snr,0.05);      
-		
-		nframes++;          
-	} 
-	
-	
-	if ((nframes%100) == 0 || rx_gain_offset == 0) {
-		if (srslte_rf_has_rssi(&rf)) {
-		rx_gain_offset = 30+10*log10(rssi*1000)-srslte_rf_get_rssi(&rf);
-		} else {
-		rx_gain_offset = srslte_rf_get_rx_gain(&rf);            
-		}
-	}
-	
-	// Plot and Printf
-	if ((nframes%10) == 0) {
 
-		printf("CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
-			srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
-			10*log10(rssi*1000) - rx_gain_offset,                        
-			10*log10(rssi_utra*1000)- rx_gain_offset, 
-			10*log10(rsrp*1000) - rx_gain_offset, 
-			10*log10(rsrq), 10*log10(snr));                
-		if (srslte_verbose != SRSLTE_VERBOSE_NONE) {
-			printf("\n");
-		}
-
-		// write "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n" into the file
-		fprintf(RSSI_fp, "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
-					srslte_ue_sync_get_cfo(&ue_sync)/1000, srslte_ue_sync_get_sfo(&ue_sync), 
-					10*log10(rssi*1000) - rx_gain_offset,                        
-					10*log10(rssi_utra*1000)- rx_gain_offset, 
-					10*log10(rsrp*1000) - rx_gain_offset, 
-					10*log10(rsrq), 10*log10(snr));
-	}
-
-}
 
 
 //plot_waterfall_t poutfft[MAX_NOF_USRP];
