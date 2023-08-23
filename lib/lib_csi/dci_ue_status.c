@@ -97,8 +97,10 @@ void* dci_ue_status_update(void* p){
 			start_time_ms	= timestamp_ms();
 			trace_count++;
 
+			csi_meanpower_t meanP;
+			csi_meanpower_init(&meanP);
 			csi_meanpower_t *csi_meanpower;
-			csi_meanpower_init(csi_meanpower);
+			csi_meanpower = &meanP;
 
 			printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
 			while(true){
@@ -183,8 +185,10 @@ void* dci_ue_status_update(void* p){
 			printf("\n\nSocket: Reception Success! \n");
 
 			if (*(uint16_t*)buffer == PREAMBLE) {
+				csi_meanpower_t meanP;
+				csi_meanpower_init(&meanP);
 				csi_meanpower_t *csi_meanpower;
-				csi_meanpower_init(csi_meanpower);
+				csi_meanpower = &meanP;
 
 				start_time_ms	= timestamp_ms();
 				trace_count++;
