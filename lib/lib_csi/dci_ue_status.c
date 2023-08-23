@@ -98,8 +98,7 @@ void* dci_ue_status_update(void* p){
 			trace_count++;
 
 			csi_meanpower_t *csi_meanpower;
-			csi_meanpower->total_sum_csi_amp = 0;
-			csi_meanpower->total_nof_csi_amp = 0;
+			csi_meanpower_init(csi_meanpower);
 
 			printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
 			while(true){
@@ -185,8 +184,7 @@ void* dci_ue_status_update(void* p){
 
 			if (*(uint16_t*)buffer == PREAMBLE) {
 				csi_meanpower_t *csi_meanpower;
-				csi_meanpower->total_sum_csi_amp = 0;
-				csi_meanpower->total_nof_csi_amp = 0;
+				csi_meanpower_init(csi_meanpower);
 
 				start_time_ms	= timestamp_ms();
 				trace_count++;

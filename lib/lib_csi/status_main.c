@@ -344,6 +344,12 @@ static void init_rawLog_setting(lteCCA_rawLog_setting_t* q){
     }    
 }
 
+int csi_meanpower_init(csi_meanpower_t* q){
+    q->total_sum_csi_amp	= 0;
+	q->total_nof_csi_amp	= 0;
+    return 0;
+}
+
 int lteCCA_status_init(lteCCA_status_t* q){
     q->status_header = 0;
     q->active_flag  = false;
