@@ -45,9 +45,14 @@ typedef struct{
     lteCCA_rawLog_setting_t rawLog_setting;
 }lteCCA_status_t;
 
+typedef struct{
+    float       total_sum_csi_amp;
+    int	        total_nof_csi_amp; // including all collected subframes and subcarriers
+}csi_meanpower_t;
+
 
 // the main function
-int lteCCA_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_status);
+int lteCCA_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_status, csi_meanpower_t* csi_meanpower);
 
 
 int lteCCA_status_init(lteCCA_status_t* q);

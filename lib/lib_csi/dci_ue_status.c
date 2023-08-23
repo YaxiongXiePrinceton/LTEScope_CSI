@@ -97,6 +97,10 @@ void* dci_ue_status_update(void* p){
 			start_time_ms	= timestamp_ms();
 			trace_count++;
 
+			csi_meanpower_t *csi_meanpower;
+			csi_meanpower->total_sum_csi_amp = 0;
+			csi_meanpower->total_nof_csi_amp = 0;
+
 			printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
 			while(true){
 				pthread_mutex_lock( &mutex_exit);
@@ -108,7 +112,7 @@ void* dci_ue_status_update(void* p){
 			
 				pthread_mutex_lock( &mutex_usage);
 				// log CSI
-				lteCCA_status_update(&ue_status_t, &ue_cell_usage);
+				lteCCA_status_update(&ue_status_t, &ue_cell_usage, csi_meanpower);
 				pthread_mutex_unlock( &mutex_usage);
 
 				/*Check the status every 0.5s*/
@@ -141,7 +145,8 @@ void* dci_ue_status_update(void* p){
 			}
 		}
 	}
-	else if(repeat_flag == 2){
+
+	else if(repeat_flag == 2 || repeat_flag == 3){
 		socklen_t len = sizeof(cliaddr);
 		printf("\n\nSocket: Waiting for client to connect! \n");
 		int connfd = accept(sockfd, (struct sockaddr*)&cliaddr, &len);
@@ -179,6 +184,10 @@ void* dci_ue_status_update(void* p){
 			printf("\n\nSocket: Reception Success! \n");
 
 			if (*(uint16_t*)buffer == PREAMBLE) {
+				csi_meanpower_t *csi_meanpower;
+				csi_meanpower->total_sum_csi_amp = 0;
+				csi_meanpower->total_nof_csi_amp = 0;
+
 				start_time_ms	= timestamp_ms();
 				trace_count++;
 				printf("\n\n We begin to log %d-th csi now .... \n\n", trace_count);
@@ -192,7 +201,7 @@ void* dci_ue_status_update(void* p){
 				
 					pthread_mutex_lock( &mutex_usage);
 					// log CSI
-					lteCCA_status_update(&ue_status_t, &ue_cell_usage);
+					lteCCA_status_update(&ue_status_t, &ue_cell_usage, csi_meanpower);
 					pthread_mutex_unlock( &mutex_usage);
 
 					/*Check the status every 0.5s*/	    
@@ -203,7 +212,16 @@ void* dci_ue_status_update(void* p){
 
 						uint16_t ack_buffer = ACK;
 						send(connfd, &ack_buffer, sizeof(ack_buffer), 0);
-						printf("\n\nSocket: We finish logging and are going to wait for next signal! \n");
+						if(repeat_flag == 3){
+							float mean_power = csi_meanpower->total_nof_csi_amp == 0 ? 0 : csi_meanpower->total_sum_csi_amp / csi_meanpower->total_nof_csi_amp;
+							// Convert the float to a string
+							char mean_power_str[50]; // Assuming the float will not occupy more than 50 characters when converted to string.
+							snprintf(mean_power_str, sizeof(mean_power_str), "%.4f", mean_power); // Convert with 4 decimal places.
+							// Send the string representation of the float
+							send(connfd, mean_power_str, strlen(mean_power_str), 0);
+							printf("\n\nSocket: We have sent the mean power: %s \n", mean_power_str);
+						}
+						printf("\n\nSocket: We finish logging and are going to wait for the next signal! \n");
 						break;
 					}
 					usleep(5e2);
@@ -216,7 +234,7 @@ void* dci_ue_status_update(void* p){
 			}
 		}
 	}
-	//close(connfd);
+
     lteCCA_status_exit(&ue_status_t);
 
     pthread_exit(NULL);

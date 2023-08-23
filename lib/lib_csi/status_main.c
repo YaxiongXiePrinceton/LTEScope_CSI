@@ -41,7 +41,7 @@ static bool check_parm_flag(lteCCA_rawLog_setting_t* q){
     return all_check; 
 }
 
-static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setting_t* config, uint16_t index){
+static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setting_t* config, uint16_t index, csi_meanpower_t* csi_meanpower){
     // first we check whether we need to forward CSI or not
      
     // return immediately if we don't need to record anything
@@ -152,6 +152,20 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 				}
 			}
 
+
+			// update the mean power, we only log the mean power of first cell, first rx, first tx.
+			if(cell_idx==0){
+				csi_amp = sf_stat->csi_amp[0][0];
+				// sum up the csi_amp of all subcarriers
+				for(int k=0;k<nof_prb*12;k++){
+					if( k%ds_subcarrier == 0 ){
+						// we add up the square of the amplititude value, which is the power
+						csi_meanpower->total_sum_csi_amp += csi_amp[k]*csi_amp[k];
+						csi_meanpower->total_nof_csi_amp += 1;
+					}
+				}				
+			}
+
 			float rssi	= sf_stat->rssi;
 			float rssi_utra	= sf_stat->rssi_utra;
 			float rsrp	= sf_stat->rsrp;
@@ -162,7 +176,7 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 			fprintf(FD_rssi, "RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
 						10*log10(rssi_utra*1000), 
 						10*log10(rsrp*1000), 
-						10*log10(rsrq), 10*log10(snr));				
+						10*log10(rsrq), 10*log10(snr));		
 		}
 	}
     }
@@ -218,9 +232,9 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
     return;
 }
 
-int single_subframe_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_usage, uint16_t index){
+int single_subframe_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_usage, uint16_t index, csi_meanpower_t* csi_meanpower){
 
-    log_single_subframe_csi(cell_usage, &(q->rawLog_setting), index);
+    log_single_subframe_csi(cell_usage, &(q->rawLog_setting), index, csi_meanpower);
 
     return 0; 
 }
@@ -234,7 +248,7 @@ bool check_valid_header(uint16_t header){
     }
 }
 
-int multi_subframe_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_usage, uint16_t start_idx, uint16_t end_idx){
+int multi_subframe_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_usage, uint16_t start_idx, uint16_t end_idx, csi_meanpower_t* csi_meanpower){
     int		nof_sf;
     uint16_t	idx;
 
@@ -251,14 +265,14 @@ int multi_subframe_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_
 
     // update the subframe status
     for(uint16_t i=start_idx+1; i<=end_idx; i++){
-	idx	= TTI_TO_IDX(i);
-	single_subframe_status_update(q, cell_usage, idx);
+		idx	= TTI_TO_IDX(i);
+		single_subframe_status_update(q, cell_usage, idx, csi_meanpower);
     } 
 
     return 0;
 }
 
-int lteCCA_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_status){
+int lteCCA_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_status, csi_meanpower_t* csi_meanpower){
     bool sync_flag = cell_status->sync_flag;
 
     /* we update the status only when all of the cells are synchronized */
@@ -288,10 +302,10 @@ int lteCCA_status_update(lteCCA_status_t* q, srslte_ue_cell_usage* cell_status){
     if(q->active_flag == false){
 	//-> 1: update a single subframe when start
 	q->active_flag = true;
-	single_subframe_status_update(q, cell_status, cell_status_header);
+	single_subframe_status_update(q, cell_status, cell_status_header, csi_meanpower);
     }else{
 	//-> 2: update all the subframes between status header and cell status header
-	multi_subframe_status_update(q, cell_status, status_header, cell_status_header);
+	multi_subframe_status_update(q, cell_status, status_header, cell_status_header, csi_meanpower);
     }
 
     /* update the status header */ 
