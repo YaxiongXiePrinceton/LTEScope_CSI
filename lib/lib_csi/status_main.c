@@ -727,6 +727,7 @@ int lteCCA_fill_fileDescriptor_folder(lteCCA_status_t* q, usrp_config_t* usrp_co
 				exit(0);
 			}
 			config->log_rssi_fd[i]    = FD;
+		}
 	}
 
     return 0;
