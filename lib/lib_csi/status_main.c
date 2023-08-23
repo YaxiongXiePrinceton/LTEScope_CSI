@@ -151,8 +151,7 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 					}
 				}
 			}
-		}
-		if( tti%10 == 0 ){
+
 			float rssi	= sf_stat->rssi;
 			float rssi_utra	= sf_stat->rssi_utra;
 			float rsrp	= sf_stat->rsrp;
@@ -163,8 +162,8 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 			fprintf(FD_rssi, "RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
 						10*log10(rssi_utra*1000), 
 						10*log10(rsrp*1000), 
-						10*log10(rsrq), 10*log10(snr));			
-	    }
+						10*log10(rsrq), 10*log10(snr));				
+		}
 	}
     }
 
