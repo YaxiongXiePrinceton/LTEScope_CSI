@@ -6,6 +6,9 @@
 #include "srslte/phy/ue/overhead.h"
 #include "srslte/phy/ue/LTESCOPE_GLOBAL.h"
 
+#include "srslte/phy/rf/rf.h"
+#include "srslte/phy/rf/rf_utils.h"
+
 #include "ue_cell_status.h"
 #define TTI_TO_IDX(i) (i%NOF_LOG_SF)
 
@@ -57,6 +60,28 @@ static int enqueue_csi_per_subframe(srslte_cell_status* q, srslte_ue_dl_t* ue_dl
 
  
     q->sf_status[index].tti = tti;
+
+    float rssi=q->sf_status[index].rssi;
+    float rssi_utra=q->sf_status[index].rssi_utra;
+    float rsrq=q->sf_status[index].rsrq;
+    float rsrp=q->sf_status[index].rsrp;
+    float snr=q->sf_status[index].snr;
+
+    srslte_chest_dl_t chest; 
+    cf_t *sf_buffer[SRSLTE_MAX_PORTS] = {NULL, NULL}; 
+    chest = ue_dl->chest;
+    sf_buffer[0] = ue_dl->sf_symbols_m[0];
+    rssi = SRSLTE_VEC_EMA(srslte_vec_avg_power_cf(sf_buffer[0],SRSLTE_SF_LEN(srslte_symbol_sz(nof_prb))),rssi,0.05);
+    rssi_utra = SRSLTE_VEC_EMA(srslte_chest_dl_get_rssi(&chest),rssi_utra,0.05);
+    rsrq = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrq(&chest),rsrq,0.05);
+    rsrp = SRSLTE_VEC_EMA(srslte_chest_dl_get_rsrp(&chest),rsrp,0.05);      
+    snr = SRSLTE_VEC_EMA(srslte_chest_dl_get_snr(&chest),snr,0.05);   
+
+    q->sf_status[index].rssi = rssi;
+    q->sf_status[index].rssi_utra = rssi_utra;
+    q->sf_status[index].rsrq = rsrq;
+    q->sf_status[index].rsrp = rsrp;
+    q->sf_status[index].snr = snr;
 
     float *csi_amp;
     float *csi_phase;
@@ -299,6 +324,11 @@ int cell_status_init(srslte_ue_cell_usage* q)
 		    q->cell_status[i].sf_status[i].csi_phase[m][n] = NULL;
 		}
 	    }
+        q->cell_status[i].sf_status[i].rssi = 0;
+        q->cell_status[i].sf_status[i].rssi_utra = 0;
+        q->cell_status[i].sf_status[i].rsrp = 0;
+        q->cell_status[i].sf_status[i].rsrq = 0;
+        q->cell_status[i].sf_status[i].snr = 0;
 	}
     }
     return 0;

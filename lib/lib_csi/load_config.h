@@ -25,6 +25,7 @@ typedef struct{
     int format;
     int log_amp_flag;
     int log_phase_flag;
+    int log_rssi_flag;
     int down_sample_subcarrier;
     int down_sample_subframe;
     int	rx_ant[MAX_NOF_USRP];

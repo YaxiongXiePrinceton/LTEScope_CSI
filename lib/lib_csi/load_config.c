@@ -132,6 +132,12 @@ int read_config_master(srslte_config_t* config){
     }else{
 	printf("log_phase_flag:%d\n", config->csiLog_config.log_phase_flag);
     }
+
+    if(! config_lookup_bool(cfg, "csiLog_config.log_rssi_flag", &config->csiLog_config.log_rssi_flag)){
+	printf("ERROR: reading log_rssi_flag\n");
+    }else{
+	printf("log_rssi_flag:%d\n", config->csiLog_config.log_rssi_flag);
+    }    
     
     if(! config_lookup_int(cfg, "csiLog_config.down_sample_subcarrier", &config->csiLog_config.down_sample_subcarrier)){
 	printf("ERROR: reading down_sample_subcarrier\n");

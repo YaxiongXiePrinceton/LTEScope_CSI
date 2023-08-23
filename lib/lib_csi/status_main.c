@@ -65,6 +65,7 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 
     FILE*	FD_amp; 
     FILE*	FD_phase;
+	FILE*	FD_rssi;
 
     float	*csi_amp;
     float	*csi_phase;
@@ -98,57 +99,71 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 
 	    // down sample the subframe 
 	    if( tti%ds_subframe == 0 ){
-		FD_amp	    = config->log_amp_fd[cell_idx];
-		FD_phase    = config->log_phase_fd[cell_idx];
+			FD_amp	    = config->log_amp_fd[cell_idx];
+			FD_phase    = config->log_phase_fd[cell_idx];
+			FD_rssi		= config->log_rssi_fd[cell_idx];
 
-		nof_prb	    = nof_prb_v[cell_idx];
-		nof_tx_ant  = nof_tx_ant_v[cell_idx];
-		nof_rx_ant  = nof_rx_ant_v[cell_idx];
+			nof_prb	    = nof_prb_v[cell_idx];
+			nof_tx_ant  = nof_tx_ant_v[cell_idx];
+			nof_rx_ant  = nof_rx_ant_v[cell_idx];
 
-		for(int i=0;i<nof_tx_ant;i++){
-		    for(int j=0;j<nof_rx_ant;j++){
-			csi_amp	    = sf_stat->csi_amp[i][j];
-			csi_phase   = sf_stat->csi_phase[i][j];
+			for(int i=0;i<nof_tx_ant;i++){
+				for(int j=0;j<nof_rx_ant;j++){
+					csi_amp	    = sf_stat->csi_amp[i][j];
+					csi_phase   = sf_stat->csi_phase[i][j];
 
-			if(config->log_amp_flag){
-			    for(int k=0;k<nof_prb*12;k++){
-				if( k%ds_subcarrier == 0 ){
-				    switch(file_format){
-					case 0:
-					    fprintf(FD_amp,   "%f\t",csi_amp[k]);
-					    break;
-					case 1:
-					    fprintf(FD_amp,   "%f,",csi_amp[k]);
-					    break;
-					default:
-					    printf("UNKNOWN file format!\n");
-					    exit(0);
-				    }
+					if(config->log_amp_flag){
+						for(int k=0;k<nof_prb*12;k++){
+						if( k%ds_subcarrier == 0 ){
+							switch(file_format){
+							case 0:
+								fprintf(FD_amp,   "%f\t",csi_amp[k]);
+								break;
+							case 1:
+								fprintf(FD_amp,   "%f,",csi_amp[k]);
+								break;
+							default:
+								printf("UNKNOWN file format!\n");
+								exit(0);
+							}
+						}
+						}
+						fprintf(FD_amp,"\n");
+					}
+
+					if(config->log_phase_flag){
+						for(int k=0;k<nof_prb*12;k++){
+						if( k%ds_subcarrier == 0 ){
+							switch(file_format){
+							case 0:
+								fprintf(FD_phase, "%f\t",csi_phase[k]);
+								break;
+							case 1:
+								fprintf(FD_phase, "%f,",csi_phase[k]);
+								break;
+							default:
+								printf("UNKNOWN file format!\n");
+								exit(0);
+							}
+						}
+						}
+						fprintf(FD_phase,"\n");
+					}
 				}
-			    }
-			    fprintf(FD_amp,"\n");
 			}
 
-			if(config->log_phase_flag){
-			    for(int k=0;k<nof_prb*12;k++){
-				if( k%ds_subcarrier == 0 ){
-				    switch(file_format){
-					case 0:
-					    fprintf(FD_phase, "%f\t",csi_phase[k]);
-					    break;
-					case 1:
-					    fprintf(FD_phase, "%f,",csi_phase[k]);
-					    break;
-					default:
-					    printf("UNKNOWN file format!\n");
-					    exit(0);
-				    }
-				}
-			    }
-			    fprintf(FD_phase,"\n");
-			}
-		    }
-		}
+			float rssi	= sf_stat->rssi;
+			float rssi_utra	= sf_stat->rssi_utra;
+			float rsrp	= sf_stat->rsrp;
+			float rsrq	= sf_stat->rsrq;
+			float snr	= sf_stat->snr;
+
+			// write "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n" into the file
+			fprintf(FD_rssi, "RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
+						10*log10(rssi*1000),
+						10*log10(rssi_utra*1000), 
+						10*log10(rsrp*1000), 
+						10*log10(rsrq), 10*log10(snr));			
 	    }
 	}
     }
@@ -296,9 +311,9 @@ static void init_rawLog_setting(lteCCA_rawLog_setting_t* q){
     q->nof_cell		= 1;
 
     q->log_amp_flag	= false;
-    
     q->log_phase_flag	= false;
-    
+	q->log_rssi_flag	= false;
+
     q->down_sample_subcarrier	= 1;	// 1 means no downsample
     q->down_sample_subframe	= 1;	// 1 means no downsample
 
@@ -346,6 +361,16 @@ int lteCCA_status_exit(lteCCA_status_t* q){
 	    }
 	}
     }
+
+	if(config->log_rssi_flag){
+		for(int i=0;i<nof_cell;i++){
+			FD = config->log_rssi_fd[i];
+			if(FD != NULL){
+				fclose(FD);
+			}
+		}
+	}
+
     // close the remote demo PC
     if(config->forward_flag){
 	char output[100];
@@ -406,6 +431,7 @@ void lteCCA_setRawLog_all(lteCCA_status_t* q, csiLog_config_t* log_config){
     config->nof_cell	    = log_config->nof_cell;
     config->log_amp_flag    = log_config->log_amp_flag;
     config->log_phase_flag  = log_config->log_phase_flag;
+	config->log_rssi_flag	= log_config->log_rssi_flag;
 
     config->down_sample_subcarrier  = log_config->down_sample_subcarrier;
     config->down_sample_subframe    = log_config->down_sample_subframe;
@@ -685,6 +711,24 @@ int lteCCA_fill_fileDescriptor_folder(lteCCA_status_t* q, usrp_config_t* usrp_co
 	    config->log_phase_fd[i]    = FD;
 	}
     }
+
+    if(config->log_rssi_flag){
+		for(int i=0;i<nof_cell;i++){
+			sprintf(fileName1, "/rssi_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d.rssiLog",
+				i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
+
+			strcpy(fileName, tmp);
+			strcat(fileName, fileName1);
+			FD = fopen(fileName,"w+");
+			clear_char_array(fileName, 128);
+
+			if(FD == NULL){
+				printf("ERROR: fail to open log file!\n");
+				exit(0);
+			}
+			config->log_rssi_fd[i]    = FD;
+	}
+
     return 0;
 }
 
@@ -721,46 +765,67 @@ int lteCCA_update_fileDescriptor(lteCCA_status_t* q, usrp_config_t* usrp_config)
     /*  Downlink dci messages file handling*/
     if(config->log_amp_flag){ 
 	
-	for(int i=0;i<nof_cell;i++){	
-	    // Close old file 
-	    FD	    = config->log_amp_fd[i];
-	    fclose(FD);
-	
-	    // open new file
-	    sprintf(fileName, "./csi_amp_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d",
-		    i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
+		for(int i=0;i<nof_cell;i++){	
+			// Close old file 
+			FD	    = config->log_amp_fd[i];
+			fclose(FD);
+		
+			// open new file
+			sprintf(fileName, "./csi_amp_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d",
+				i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
 
-	    strftime(fileName1, 128, "_%Y_%m_%d_%H_%M_%S.csiLog",newtime);
-	    strcat(fileName, fileName1);
-	    FD = fopen(fileName,"w+");
-	    if(FD == NULL){
-		printf("ERROR: fail to open log file!\n");
-		exit(0);
-	    }
-	    config->log_amp_fd[i]    = FD;
-	}
+			strftime(fileName1, 128, "_%Y_%m_%d_%H_%M_%S.csiLog",newtime);
+			strcat(fileName, fileName1);
+			FD = fopen(fileName,"w+");
+			if(FD == NULL){
+			printf("ERROR: fail to open log file!\n");
+			exit(0);
+			}
+			config->log_amp_fd[i]    = FD;
+		}
     }
 
     /*  Downlink dci messages file handling*/
     if(config->log_phase_flag){ 
-	for(int i=0;i<nof_cell;i++){	
-	    // Close old file 
-	    FD	    = config->log_phase_fd[i];
-	    fclose(FD);
+		for(int i=0;i<nof_cell;i++){	
+			// Close old file 
+			FD	    = config->log_phase_fd[i];
+			fclose(FD);
 
-	    // open new file
-	    sprintf(fileName, "./csi_phase_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d",
-		    i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
-	    strftime(fileName1, 128, "_%Y_%m_%d_%H_%M_%S.csiLog",newtime);
-	    strcat(fileName, fileName1);
-	    FD = fopen(fileName,"w+");
-	    if(FD == NULL){
-		printf("ERROR: fail to open log file!\n");
-		exit(0);
-	    }
-	    config->log_phase_fd[i]    = FD;
-	}
+			// open new file
+			sprintf(fileName, "./csi_phase_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d",
+				i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
+			strftime(fileName1, 128, "_%Y_%m_%d_%H_%M_%S.csiLog",newtime);
+			strcat(fileName, fileName1);
+			FD = fopen(fileName,"w+");
+			if(FD == NULL){
+			printf("ERROR: fail to open log file!\n");
+			exit(0);
+			}
+			config->log_phase_fd[i]    = FD;
+		}
     }
+
+	if(config->log_rssi_flag){
+		for(int i=0;i<nof_cell;i++){
+			// Close old file
+			FD	    = config->log_rssi_fd[i];
+			fclose(FD);
+
+			// open new file
+			sprintf(fileName, "./rssi_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d",
+				i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
+			strftime(fileName1, 128, "_%Y_%m_%d_%H_%M_%S.rssiLog",newtime);
+			strcat(fileName, fileName1);
+			FD = fopen(fileName,"w+");
+			if(FD == NULL){
+				printf("ERROR: fail to open log file!\n");
+				exit(0);
+			}
+			config->log_rssi_fd[i]    = FD;
+		}
+	}
+
     return 0;
 }
 
@@ -846,5 +911,29 @@ int lteCCA_update_fileDescriptor_folder(lteCCA_status_t* q, usrp_config_t* usrp_
 	    config->log_phase_fd[i]    = FD;
 	}
     }
+
+    /*  Downlink RSSI/RSRP messages file handling*/
+    if(config->log_rssi_flag){ 
+		for(int i=0;i<nof_cell;i++){	
+			// Close old file 
+			FD	    = config->log_rssi_fd[i];
+			fclose(FD);
+
+			// open new file
+			sprintf(fileName1, "/rssi_usrpIdx_%d_freq_%lld_N_%d_PRB_%d_TX_%d_RX_%d.rssiLog",
+				i, usrp_config[i].rf_freq, usrp_config[i].N_id_2, nof_prb[i], nof_tx_ant[i], nof_rx_ant[i]);
+			strcpy(fileName, tmp);
+			strcat(fileName, fileName1);
+			FD = fopen(fileName,"w+");
+			clear_char_array(fileName, 128);
+
+			if(FD == NULL){
+				printf("ERROR: fail to open log file!\n");
+				exit(0);
+			}
+			config->log_rssi_fd[i]    = FD;
+		}
+    }
+
     return 0;
 }

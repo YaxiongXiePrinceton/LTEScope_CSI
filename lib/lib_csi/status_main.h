@@ -29,6 +29,9 @@ typedef struct{
     bool	log_phase_flag;
     FILE*	log_phase_fd[MAX_NOF_USRP];	
 
+    bool    log_rssi_flag;
+    FILE*   log_rssi_fd[MAX_NOF_USRP];
+
     int		down_sample_subcarrier;
     int		down_sample_subframe;
  

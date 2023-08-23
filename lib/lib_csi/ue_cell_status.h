@@ -27,6 +27,12 @@ typedef struct SRSLTE_API{
     //float		    ***csi_phase;	// 3d csi phase matrix
     float   *csi_amp[4][4];		// 3d csi amp matrix
     float   *csi_phase[4][4];	// 3d csi phase matrix
+    // only logging port 0
+    float rssi;
+    float rssi_utra; 
+    float rsrp;
+    float rsrq;
+    float snr;    
 
 }srslte_subframe_status;
 
