@@ -151,7 +151,8 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 					}
 				}
 			}
-
+		}
+		if( tti%10 == 0 ){
 			float rssi	= sf_stat->rssi;
 			float rssi_utra	= sf_stat->rssi_utra;
 			float rsrp	= sf_stat->rsrp;
@@ -159,8 +160,7 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 			float snr	= sf_stat->snr;
 
 			// write "CFO: %+8.4f kHz, SFO: %+8.4f Hz, RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n" into the file
-			fprintf(FD_rssi, "RSSI: %5.1f dBm, RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
-						10*log10(rssi*1000),
+			fprintf(FD_rssi, "RSSI/ref-symbol: %+5.1f dBm, RSRP: %+5.1f dBm, RSRQ: %5.1f dB, SNR: %5.1f dB\r\n",
 						10*log10(rssi_utra*1000), 
 						10*log10(rsrp*1000), 
 						10*log10(rsrq), 10*log10(snr));			
