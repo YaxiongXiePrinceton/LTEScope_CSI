@@ -160,7 +160,7 @@ static void log_single_subframe_csi(srslte_ue_cell_usage* q, lteCCA_rawLog_setti
 				for(int k=0;k<nof_prb*12;k++){
 					if( k%ds_subcarrier == 0 ){
 						// we add up the square of the amplititude value, which is the power
-						csi_meanpower->total_sum_csi_amp += csi_amp[k]*csi_amp[k];
+						csi_meanpower->total_sum_csi_amp += 10*log10(csi_amp[k]*csi_amp[k]);
 						csi_meanpower->total_nof_csi_amp += 1;
 					}
 				}				
