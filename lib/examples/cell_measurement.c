@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
   //open file in the current folder then data/ with name "RSSI_freq_%d_current_month_day_hour_minute_second", if not exist, create one
   char filename[100];
   double freq_in_MHz = prog_args.rf_freq / 1e6;
-  sprintf(filename, "./data/RSSI_freq_%4.0f_%s", freq_in_MHz, buffer);
+  sprintf(filename, "~/fanyi/LTEScope_CSI/build/lib/examples/data/RSSI_freq_%4.0f_%s", freq_in_MHz, buffer);
   FILE *RSSI_fp;
   RSSI_fp = fopen(filename, "w");  
   if (RSSI_fp == NULL) {
